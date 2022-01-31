@@ -17,8 +17,3 @@ São por meio dos focos de calor obtidos por meio de satélites que são monitor
 ### Objetivo do Projeto de Pesquisa
 
 Analisar e comparar as tendências e sazonalidades da quantidade de focos de calor obtidos com os satélites AQUA-MT, atualmente empregado na política pública de combate aos incêndios no estado de São Paulo, e aqueles obtidos pelo satélite Suomi NPP, mais sensível aos focos de calor, ao longo da série histórica.
-
-<br>
-
-----
-

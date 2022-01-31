@@ -1,7 +1,14 @@
 ---
 title: "Análise de Séries Temporais dos Focos de Calor"
-output: html_notebook
+#output: html_notebook
+output:
+  html_document:
+    toc: true
+    theme: united
+    
 ---
+
+<br>
 
 **Sobre**
 
@@ -20,22 +27,28 @@ Inicialmente importa-se os *packages* que serão necessários para a análise
 library('lubridate') # Date
 library('dplyr') # Tables
 library('forecast')
+library('lmtest') # Granger-Causality Test
+library('FinTS') # ArchTest
+library('urca') # Unit Root (Raiz Unitária)
 library('here') # Pastas
+library('rmarkdown')
 ```
 
 <br>
+
+----
 
 # Dados
 
 Os dados foram obtidos por meio do [Programa Queimadas](https://queimadas.dgi.inpe.br/queimadas/portal), mantido pelo INPE.
 *Scripts* foram elaborados para obtenção contínua desses dados, visando garantir que o [*site* openfocos.michelmetran.com.br](https://openfocos.michelmetran.com.br/sat/) que elaborei, apresentando *dashboards* elaborados com o *Tableau*, estivesse permanentemente atualizado. No repositório [open-focos/focos_inpe](https://github.com/open-focos/focos_inpe) são apresentadas as rotinas e ajustes para obtenção dos dados.
 
-No presente *script* faz-se a leitura/carregamento desses mesmos dados consolidados até 31.12.2021.
+No presente *script* faz-se a leitura/carregamento desses mesmos dados consolidados até 31.12.2021. Cada registro na tabela representa um foco de calor observado e, para cada foco, tem-se informações sobre o horário de captura do foco pelo satélte, qual o satélite, a localização por meio de coordenadas geográficas entre outras informações.
 
-Fiz usando o *data.frame*, porém uma alternativa interessante é utilizar objetos do tipo *tibble*, conforme o prof. Fabiano Guasti sugere.
+Fiz a leitura dos dados usando um objeto do tip *data.frame*, porém uma alternativa interessante é utilizar objetos do tipo *tibble*, conforme o prof. Fabiano Guasti sugere. (#TODO)
 
 ```{r}
-# Lê Tabela ----
+# Lê Tabela
 df <- read.csv(
   here(here('data', 'input', 'tab_serie_gmt_1999-2021.csv')),
   header = TRUE,
@@ -45,7 +58,12 @@ df <- read.csv(
 
 # Results
 head(df)
+```
+<br>
 
+Após a leitura da tabela, alguns ajustes nos tipos de variáveis das colunas.
+
+```{r}
 # Ajusta os dtypes
 df$data_hora_gmt <- as.Date(df$data_hora_gmt, format='%Y-%m-%d %H:%M:%S')
 df$data_hora_sp <- as.Date(df$data_hora_sp, format='%Y-%m-%d %H:%M:%S')
@@ -56,12 +74,9 @@ df$mes <- lubridate::month(df$data_hora_sp)
 df$dia <- lubridate::day(df$data_hora_sp)
 
 # Vê os dtypes
-sapply(df, class)
-sapply(df, typeof)
+#sapply(df, class)
+#sapply(df, typeof)
 str(df)
-
-# Print head
-print.data.frame(head(df, 3))
 ```
 
 <br>
@@ -73,22 +88,24 @@ Uma vez com a tabela ajustada, com as correções dos *dtypes*, é possível ext
 ```{r}
 # Lista de Satélites
 list_sats <- unique(df$satelite)
-list_sats
+#list_sats
 
 # Extraí Satélite AQUA_M-T
 df_aqua <- subset(df, satelite == 'AQUA_M-T')
-df_aqua
-str(df_aqua)
+#df_aqua
+#str(df_aqua)
 
 # Extraí Satélite NPP-375
 df_npp <- subset(df, satelite == 'NPP-375')
-df_npp
-str(df_npp)
+#df_npp
+#str(df_npp)
 ```
 
 <br>
 
-# Faz acúmulo pra Dados Mensal
+## Faz acúmulo pra Dados Mensal
+
+Uma vez com os dados dos focos de calor, faz-se necessário agrupar as informações. Optou-se por fazer a soma de registros por mês, sendo esse um parâmetro (*Nº de Focos por mês*) bastante empregado nas discussões sobre o enfrentamento de incêndios. Fez-se isso para o satélite AQUA-MT.
 
 ```{r}
 # Agrupa Dataframe AQUA
@@ -102,10 +119,24 @@ df_aqua_m$date <- zoo::as.yearmon(paste(df_aqua_m$ano, df_aqua_m$mes), '%Y %m')
 # Deleta Mês e Ano
 df_aqua_m$ano <- NULL
 df_aqua_m$mes <- NULL
+
+# Vê os dtypes
+sapply(df_aqua_m, class)
+sapply(df_aqua_m, typeof)
+
+# Reorder columns
+df_aqua_m <- df_aqua_m[,c(2, 1)]
+colnames(df_aqua_m)
+
 head(df_aqua_m)
 tail(df_aqua_m)
+```
 
+<br>
 
+Empregou-se a mesma rotina para o satélite NPP.
+
+```{r}
 # Agrupa Dataframe NPP
 df_npp_m <- df_npp %>%
   dplyr::group_by(ano, mes) %>%
@@ -117,45 +148,69 @@ df_npp_m$date <- zoo::as.yearmon(paste(df_npp_m$ano, df_npp_m$mes), '%Y %m')
 # Deleta Mês e Ano
 df_npp_m$ano <- NULL
 df_npp_m$mes <- NULL
+
+# Vê os dtypes
+sapply(df_npp_m, class)
+sapply(df_npp_m, typeof)
+
+# Reorder columns
+df_npp_m <- df_npp_m[,c(2, 1)]
+colnames(df_npp_m)
+
+# Results
 head(df_npp_m)
 tail(df_npp_m)
 ```
 
+<br>
 
-
-```{r}
-# Vê os dtypes
-sapply(df_sat, class)
-sapply(df_sat, typeof)
-
-# Reorder columns
-df_sat <- df_sat[,c(2, 1)]
-colnames(df_sat)
-```
-
-
-```{r}
-# Print head
-print.data.frame(head(df_sat, 3))
-print.data.frame(tail(df_sat, 3))
-```
-
+----
 
 # Séries Temporais
 
+Uma vez com os dados devidamente organizados, agrupados etc, foi possível dar início a análise das séries temporais.
+Inicialmente fez-se necessário converter a série do *data.frame* em um objeto *time-series* (ou *ts*).
+
+**Importante: daqui pra frente, por ora!, seguirei apenas com a série do satélite AQUA-MT! Uma vez definido o método de comparação das séries, desenvolvo (#TODO) as rotinas para o NPP....**
+
 ```{r}
-# Definição da série
+# Definição da série AQUA
 serie <- ts(
-  df_sat$n_focos,
+  df_aqua_m$n_focos,
   start = c(2002,7),
-  end = c(2021, 9),
+  end = c(2021, 12),
   frequency = 12
 )
 
+# Definição da série AQUA
+serie_aqua <- ts(
+  df_aqua_m$n_focos,
+  start = c(2012, 1),
+  end = c(2021, 12),
+  frequency = 12
+)
+
+# Definição da série NPP
+serie_npp <- ts(
+  df_npp_m$n_focos,
+  start = c(2012, 1),
+  end = c(2021, 12),
+  frequency = 12
+)
+
+# Results
 serie
 ```
 
+<br>
 
+## Explorando
+
+Gráficos possibilitam ver a série temporal e começam a trazer interpretações possíveis:
+- Anos secos de 2010 e 2020;
+- Anos chuvosos de 2009;
+
+Todas estas variáveis contribuiram para o número de focos registrado.
 
 ```{r}
 # Gráficos
@@ -163,13 +218,28 @@ forecast::autoplot(serie)
 plot.ts(serie, main = 'Nº de Focos de Calor')
 ```
 
-## Explorando
+<br>
+
+Abaixo é possível plotar os gráficos de ACF e PACF.
+O **PACF** (*partial autocorrelation function*) evidencia picos no *lag* 12 aproximadamente, evidenciando a recorrÊncia do evento a cada 12 meses, coincidindo com os picos da estiagem.
+
+*Na análise de séries temporais, a função de autocorrelação parcial fornece a correlação parcial de uma série temporal estacionária com seus próprios valores defasados, regredindo os valores da série temporal em todos os intervalos mais curtos. Contrasta com a função de autocorrelação, que não controla outros atrasos.*
+[Wikipedia](https://en.wikipedia.org/wiki/Partial_autocorrelation_function)
 
 ```{r}
+# Gráficos
 acf(serie) # autocorrelação
 pacf(serie) # autocorrelação parcial
-ggtsdisplay(serie) # avaliação em visualização única
-diff(serie) # diferença entre os meses
+
+# Avaliação em visualização única
+ggtsdisplay(serie) 
+```
+<br>
+
+Outro gráfico interessante mostra a série de todos os anos, no mesmo gráfico.
+Tal gráfico evidencia que nos meses de agosto/setembro são esperados mais focos de calor.
+
+```{r}
 seasonplot(
   serie,
   col=rainbow(12),
@@ -179,46 +249,67 @@ seasonplot(
 )
 ```
 
+<br>
+
 ## Decomposição
 
+Variações sazonais e aleatórias parecem ser constante ao longo do texto
+
 ```{r}
-# variações sazonais e aleatórias parecem ser constante ao longo do texto
-plot.ts(serie) # dados originais, picos no verão e no inverno
-serie_components <- decompose(serie) # estimando os componentes
-serie_components$seasonal # obter os valores estimados do componentes sazonal
+# Decompose: estimando os componentes
+serie_components <- decompose(serie) 
+
+# Obter os valores estimados do componentes sazonal
+serie_components$seasonal 
+
+# Plot
 plot(serie_components)
 ```
 
 <br>
 
+----
+
 ## Teste de Estacionariedade
 
-É uma série estacionária!
+<br>
 
-### Teste de Dickey-Fuller (Pacote tseries)
+É necessário avaliar se a série temporal é estacionária ou não. Para isso há alguns testes que podem ser realizados, principalmente o teste de *Dickey-Fuller*.
+
+**Importante**: Já adianto que é sim estacionária!!
+
+<br>
+
+### Teste de Dickey-Fuller (Pacote *tseries*)
 
 ```{r}
 tseries::adf.test(serie)
 tseries::adf.test(serie, k = 12)
 ```
 
-### Teste de Dickey-Fuller (Pacote URDN)
+### Teste de Dickey-Fuller (Pacote *urca*)
 
-Aprendi com prof. Fabiano!
+Aprendi com prof. Fabiano Guasti
 
 ```{r}
-library('urca') # Unit Root (Raiz Unitária)
-
-teste_pack2=ur.df(serie)
-teste_pack2
-summary(teste_pack2)
+teste_serie_urca=ur.df(serie)
+teste_serie_urca
+summary(teste_serie_urca)
 ```
 
 **Conclusão/Interpretação**
 
 Analisamos se há algum coeficiente que seja significativo.
-No caso vemos *z.lag.1* com *p-value* de 1.49e-07***, ou seja, é menor que 0.01 (à 99% de confiança), e portanto eu REJEITO Ho: a série é estacionária!!
+No caso vemos *z.lag.1* com *p-value* de 1.31e-09***, ou seja, é menor que 0.01 (à 99% de confiança), e portanto eu REJEITO Ho: a série é estacionária!!
 
+<br>
+
+**Dúvidas**
+
+É necessário definir o lag?
+Por que o mesmo teste, calculado em diferentes, resulta em valores distintos?
+
+<br>
 
 ### Teste de KPSS
 
@@ -226,69 +317,92 @@ No caso vemos *z.lag.1* com *p-value* de 1.49e-07***, ou seja, é menor que 0.01
 - H1: A série NÃO é Estacionária
 
 ```{r}
-testeKPSS_ar=ur.kpss(serie)
-testeKPSS_ar
-
-summary(testeKPSS_ar)
+teste_kpss=ur.kpss(serie)
+teste_kpss
+summary(teste_kpss)
 ```
 
 **Conclusão/Interpretação**
-Sendo o *t-test* = 0.0859 menor que **0.739** (ponto crítico para 99% confiança): ACEITO Ho e, portanto, a série é estacionária.
+Sendo o *t-test* = 0.0829 menor que **0.739** (ponto crítico para 99% confiança): ACEITO Ho e, portanto, a série é estacionária.
+
+<br>
+
+----
+
+# Definindo Estacionariedade
+
+<br>
+
+Visando tornar a série estacionária, é possível promover a diferenciação ou transformação.
 
 <br>
 
 ## Diferenciação
 
-Etapa 1: N Diff
+No caso da śerie do satélite AQUA-MT a diferenciação não se fazer necessária visto que a série já era estacionária!
+Além disso (e por isso), o *n_dif* resultou em zero!
 
 ```{r}
+# Faz a difereciação entre os meses
+diff(serie)
+
 # Calcula diferença entre os meses
 n_dif <- ndiffs(serie) 
 n_dif
 
 #serie_ndiff <- diff(serie, n_dif)
 serie_ndiff <- serie
-ggtsdisplay(serie_ndiff) # avaliação em visualização única
-```
 
+# Avaliação em visualização única
+ggtsdisplay(serie_ndiff)
+```
 
 <br>
 
 ## Transformação
 
-Etapa 2: Box-Cox
+Visando aperfeiçoar a aderÊncia dos modelos, é possível ainda transformar a série por meio do Box-Cox.
 
 ```{r}
-#
+# Parâmetro Lambda
 lbd <- BoxCox.lambda(serie_ndiff)
 lbd
 
-#
+# Cria Nova Série
 serie_ndiff_bc <- BoxCox(serie_ndiff, lambda = lbd)
-hist(serie_ndiff_bc) # antes
+
+# Antes
+hist(serie_ndiff_bc) 
+
+# Gráfico Simples
 autoplot(serie_ndiff_bc)
+
+# Gráfico Combinado
 ggtsdisplay(serie_ndiff_bc)
 ```
 
+<br>
 
+# Modelo
 
-# Estimar Coeficientes
+Após estar com a série temporal em mais, corrigida, testada etc: vamos para a parte de definir o modelo e estimar coeficientes. Isso é feito com o ***auto.arima***, conforme apresentaod a seguir.
 
 ```{r}
-estima = auto.arima(serie, trace=T)
-estima
+# Best model: ARIMA(1,0,0)(0,1,1)[12] 
+modelo = auto.arima(serie, trace=T)
+modelo
 
-estima_t = auto.arima(serie_ndiff_bc, trace=T)
-estima_t
+# Best model: ARIMA(1,0,0)(0,1,1)[12] with drift 
+modelo_t = auto.arima(serie_ndiff_bc, trace=T)
+modelo_t
 ```
 
+Por meio do *Best Model* descobri que meu modelo é um SARIMA, ou seja, um ARIMA com sazonalidade.
 
-Puta merda!,
-Descobri que tenho um SARIMA!
-https://otexts.com/fpp3/seasonal-arima.html
+[Estudar](https://otexts.com/fpp3/seasonal-arima.html)
 
 Notei tb que consegui um AIC muito baixo com a transformação de Box-Cox.
-
+Não sei se isso é melhor do que sem a transformação.
 
 ARIMA(1,0,0)(0,1,1)[12]
 Modelo
@@ -303,9 +417,8 @@ Sazonal:
 
 
 ```{r}
-estima_t$coef
+modelo_t$coef
 ```
-
 
 -----
 
@@ -313,27 +426,30 @@ estima_t$coef
 
 # Resíduos
 
+A análise dos resíduos é fundamental.
 - Os resíduos não podem ter autocorrelação!
 - Os resíduos precisam ter uma distribuição normal!
 
 [residuals](https://stackoverflow.com/questions/55742013/extract-p-value-from-checkresiduals-function)
 
+<br>
 
 ## Autocorrelação
 
 Com o teste de *Ljung-Box*, obtemos o *p-valor* e, se menor que 0,05, aceitamos H0, e portanto, definimos que os resíduos não estão correlacionados!
 
 ```{r}
-checkresiduals(estima)
-checkresiduals(estima_t)
+checkresiduals(modelo)
+checkresiduals(modelo_t)
 ```
+
 <br>
 
 **Conclusão/Interpretação**
 
 teste de Ljung-Box p-value = 0.7287>0.01, aceitamos H0, resíduos não são correlacionados
 
-
+<br>
 
 ## Normalidade dos resíduos
 
@@ -341,35 +457,34 @@ Teste de Kolmogorov Smirnov
 
 ```{r}
 ks.test(
-  estima_t$residuals,
+  modelo_t$residuals,
   "pnorm",
-  mean(estima_t$residuals),
-  sd(estima_t$residuals)
+  mean(modelo_t$residuals),
+  sd(modelo_t$residuals)
 )
 ```
 
-
 **Conclusão/Interpretação**
 
-p-valor = 0.07139 > 0,01 - Aceita H0, ou seja, resíduos normais. 
+p-valor é 0.0653 e, portantro, maior que 0,01.
+Aceita-se H0, ou seja, os resíduos são normais!
 
-confirmada a não existência de autocorrelação serial e normalidade dos resíduos
+Confirmada a não existência de autocorrelação serial e normalidade dos resíduos
 
 <br>
 
 ## Estacionariedade da Variância
+
 Podemos verificar a estacionariedade de variãncia
-verificar se existe efeitos ARCH
+Verificar se existe efeitos ARCH
 
 ```{r}
-library('FinTS')
-
-ArchTest(estima_t$residuals)
+ArchTest(modelo_t$residuals)
 ```
 
 **Conclusão/Interpretação**
 
-p-valor 0.4976 > 0,01, aceita-se H0, não se rejeita a H0, garante não existência de efeitos ARCH
+p-valor 0.583 > 0,01, aceita-se H0, não se rejeita a H0, garante não existência de efeitos ARCH
 
 -----
 
@@ -377,19 +492,46 @@ p-valor 0.4976 > 0,01, aceita-se H0, não se rejeita a H0, garante não existên
 
 ```{r}
 # Previsão
-serie_ndiff_bc_forecast <- forecast::forecast(serie_ndiff_bc, h = 48)
-
-
+serie_ndiff_bc_forecast <- forecast::forecast(modelo_t, h = 48)
 
 plot(serie_ndiff_bc_forecast)
 ```
+
+
 ```{r}
-accuracy(
-  serie_ndiff_bc_forecast,
+accuracy(modelo_t,
   #df_sat$n_focos
 )
 #accuracy(prevvarejo, varejoteste)
 ```
 MAPE 50: signifa que tem 50% de erro!
 Bosta!
+
+<br>
+
+----
+
+# Comparando Séries
+
+**Granger-Causality Test**
+- H0: Time series X does not cause time series Y to Granger-cause itself.
+- H1: Time series X  cause time series Y to Granger-cause itself.
+
+**Referência**
+- [StackExchange: How to statistically compare two time series?](https://stats.stackexchange.com/questions/19103/how-to-statistically-compare-two-time-series)
+- [Wikipedia: Granger causality](https://en.wikipedia.org/wiki/Granger_causality)
+
+```{r}
+grangertest(serie_npp ~ serie_aqua)
+```
+
+Podemos rejeitar a hipótese nula do teste porque o valor de p é menor que 0,05, e inferir que conhecer os valores de serie_aqua é valioso para prever os valores futuros de serie_npp
+
+
+```{r}
+grangertest(serie_aqua ~ serie_npp)
+```
+
+O reverso não ocorre!! Os valores de NPP não possibilitam prever AQUA!!
+Com p-valor de 0.3424, maior que 0.05, devemos aceitar a hipotese nula.
 
