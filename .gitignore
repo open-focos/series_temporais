@@ -1,9 +1,16 @@
-# Byte-compiled / optimized / DLL files
-.ipynb_checkpoints/
+# Dados
+test/*.html
 
+# R
+.Rproj.user/
+.Rhistory
+.RData
+
+# IDEs
 .idea/
 .vscode/
 
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -12,6 +19,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+
 .Python
 build/
 develop-eggs/
@@ -132,3 +140,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.Rproj.user

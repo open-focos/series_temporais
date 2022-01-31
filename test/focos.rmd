@@ -1,0 +1,366 @@
+---
+title: "Focos de Calor"
+output: html_notebook
+---
+
+
+O presente script é parte dos estudos para entrega do TCC do PECEGE.
+O objetivo é comparar séries históricas.
+
+
+Inicialmente importa-se os *packages* que serão necessários para a análise
+
+```{r}
+library('lubridate') # Date
+library('dplyr') # Tables
+library('forecast')
+library('here') # Pastas
+```
+
+
+# Dados
+
+Posteriormente faz-se a leitura/carregamento dos dados.
+
+Fiz usando o *data.frame*, porém uma alternativa interessante é utilizar objetos do tipo *tibble*, conforme o prof. Fabiano Guasti sugere.
+
+```{r}
+# Lê Tabela ----
+df <- read.csv(
+  here(here('data', 'tab_serie_gmt_1999-2021.csv')),
+  header = TRUE,
+  sep = ';',
+  dec=',',
+)
+
+# Results
+head(df)
+
+# Ajusta os dtypes
+df$data_hora_gmt <- as.Date(df$data_hora_gmt, format='%Y-%m-%d %H:%M:%S')
+df$data_hora_sp <- as.Date(df$data_hora_sp, format='%Y-%m-%d %H:%M:%S')
+
+# Extraí parte da data
+df$ano <- lubridate::year(df$data_hora_sp)
+df$mes <- lubridate::month(df$data_hora_sp)
+df$dia <- lubridate::day(df$data_hora_sp)
+
+# Vê os dtypes
+sapply(df, class)
+sapply(df, typeof)
+str(df)
+
+# Print head
+print.data.frame(head(df, 3))
+```
+
+<br>
+
+## Seleciona *Subset* por Satélite
+
+Uma vez com a tabela ajustada, com as correções dos *dtypes*, é possível extrair as séries de apena sum satélite.
+
+```{r}
+# Lista de Satélites
+list_sats <- unique(df$satelite)
+list_sats[1]
+
+# Extraí Satélite
+df <- subset(df, satelite == 'AQUA_M-T')
+df
+
+# 
+str(df)
+```
+
+<br>
+
+# Faz acúmulo pra Dados Mensal
+
+```{r}
+# Agrupa Dataframe ----
+df_sat <- df %>%
+  dplyr::group_by(ano, mes) %>%
+  dplyr::summarise(n_focos = n(), .groups = 'drop')
+
+# Cria coluna com Data
+df_sat$date <- zoo::as.yearmon(paste(df_sat$ano, df_sat$mes), '%Y %m')
+
+# Deleta Mês e Ano
+df_sat$ano <- NULL
+df_sat$mes <- NULL
+df_sat
+```
+
+
+
+```{r}
+# Vê os dtypes
+sapply(df_sat, class)
+sapply(df_sat, typeof)
+
+# Reorder columns
+df_sat <- df_sat[,c(2, 1)]
+colnames(df_sat)
+```
+
+
+```{r}
+# Print head
+print.data.frame(head(df_sat, 3))
+print.data.frame(tail(df_sat, 3))
+```
+
+
+# Séries Temporais
+
+```{r}
+# Definição da série
+serie <- ts(
+  df_sat$n_focos,
+  start = c(2002,7),
+  end = c(2021, 9),
+  frequency = 12
+)
+
+serie
+```
+
+
+
+```{r}
+# Gráficos
+forecast::autoplot(serie)
+plot.ts(serie, main = 'Nº de Focos de Calor')
+```
+
+## Explorando
+
+```{r}
+acf(serie) # autocorrelação
+pacf(serie) # autocorrelação parcial
+ggtsdisplay(serie) # avaliação em visualização única
+diff(serie) # diferença entre os meses
+seasonplot(
+  serie,
+  col=rainbow(12),
+  year.labels=TRUE,
+  type='o',
+  pch=16
+)
+```
+
+## Decomposição
+
+```{r}
+# variações sazonais e aleatórias parecem ser constante ao longo do texto
+plot.ts(serie) # dados originais, picos no verão e no inverno
+serie_components <- decompose(serie) # estimando os componentes
+serie_components$seasonal # obter os valores estimados do componentes sazonal
+plot(serie_components)
+```
+
+<br>
+
+## Teste de Estacionariedade
+
+É uma série estacionária!
+
+### Teste de Dickey-Fuller (Pacote tseries)
+
+```{r}
+tseries::adf.test(serie)
+tseries::adf.test(serie, k = 12)
+```
+
+### Teste de Dickey-Fuller (Pacote URDN)
+
+Aprendi com prof. Fabiano!
+
+```{r}
+library('urca') # Unit Root (Raiz Unitária)
+
+teste_pack2=ur.df(serie)
+teste_pack2
+summary(teste_pack2)
+```
+
+**Conclusão/Interpretação**
+
+Analisamos se há algum coeficiente que seja significativo.
+No caso vemos *z.lag.1* com *p-value* de 1.49e-07***, ou seja, é menor que 0.01 (à 99% de confiança), e portanto eu REJEITO Ho: a série é estacionária!!
+
+
+### Teste de KPSS
+
+- Ho: A série é Estacionária
+- H1: A série NÃO é Estacionária
+
+```{r}
+testeKPSS_ar=ur.kpss(serie)
+testeKPSS_ar
+
+summary(testeKPSS_ar)
+```
+
+**Conclusão/Interpretação**
+Sendo o *t-test* = 0.0859 menor que **0.739** (ponto crítico para 99% confiança): ACEITO Ho e, portanto, a série é estacionária.
+
+<br>
+
+## Diferenciação
+
+Etapa 1: N Diff
+
+```{r}
+# Calcula diferença entre os meses
+n_dif <- ndiffs(serie) 
+n_dif
+
+#serie_ndiff <- diff(serie, n_dif)
+serie_ndiff <- serie
+ggtsdisplay(serie_ndiff) # avaliação em visualização única
+```
+
+
+<br>
+
+## Transformação
+
+Etapa 2: Box-Cox
+
+```{r}
+#
+lbd <- BoxCox.lambda(serie_ndiff)
+lbd
+
+#
+serie_ndiff_bc <- BoxCox(serie_ndiff, lambda = lbd)
+hist(serie_ndiff_bc) # antes
+autoplot(serie_ndiff_bc)
+ggtsdisplay(serie_ndiff_bc)
+```
+
+
+
+# Estimar Coeficientes
+
+```{r}
+estima = auto.arima(serie, trace=T)
+estima
+
+estima_t = auto.arima(serie_ndiff_bc, trace=T)
+estima_t
+```
+
+
+Puta merda!,
+Descobri que tenho um SARIMA!
+https://otexts.com/fpp3/seasonal-arima.html
+
+Notei tb que consegui um AIC muito baixo com a transformação de Box-Cox.
+
+
+ARIMA(1,0,0)(0,1,1)[12]
+Modelo
+- Autoregressivo de ordem 1
+- Não Integrado
+- Sem Médias Móveis
+
+Sazonal:
+- Não Autoregressivo
+- Integrado
+- Com Médias Móveis
+
+
+```{r}
+estima_t$coef
+```
+
+
+-----
+
+<br>
+
+# Resíduos
+
+- Os resíduos não podem ter autocorrelação!
+- Os resíduos precisam ter uma distribuição normal!
+
+[residuals](https://stackoverflow.com/questions/55742013/extract-p-value-from-checkresiduals-function)
+
+
+## Autocorrelação
+
+Com o teste de *Ljung-Box*, obtemos o *p-valor* e, se menor que 0,05, aceitamos H0, e portanto, definimos que os resíduos não estão correlacionados!
+
+```{r}
+checkresiduals(estima)
+checkresiduals(estima_t)
+```
+<br>
+
+**Conclusão/Interpretação**
+
+teste de Ljung-Box p-value = 0.7287>0.01, aceitamos H0, resíduos não são correlacionados
+
+
+
+## Normalidade dos resíduos
+
+Teste de Kolmogorov Smirnov
+
+```{r}
+ks.test(
+  estima_t$residuals,
+  "pnorm",
+  mean(estima_t$residuals),
+  sd(estima_t$residuals)
+)
+```
+
+
+**Conclusão/Interpretação**
+
+p-valor = 0.07139 > 0,01 - Aceita H0, ou seja, resíduos normais. 
+
+confirmada a não existência de autocorrelação serial e normalidade dos resíduos
+
+<br>
+
+## Estacionariedade da Variância
+Podemos verificar a estacionariedade de variãncia
+verificar se existe efeitos ARCH
+
+```{r}
+library('FinTS')
+
+ArchTest(estima_t$residuals)
+```
+
+**Conclusão/Interpretação**
+
+p-valor 0.4976 > 0,01, aceita-se H0, não se rejeita a H0, garante não existência de efeitos ARCH
+
+-----
+
+# Previsão
+
+```{r}
+# Previsão
+serie_ndiff_bc_forecast <- forecast::forecast(serie_ndiff_bc, h = 48)
+
+
+
+plot(serie_ndiff_bc_forecast)
+```
+```{r}
+accuracy(
+  serie_ndiff_bc_forecast,
+  #df_sat$n_focos
+)
+#accuracy(prevvarejo, varejoteste)
+```
+MAPE 50: signifa que tem 50% de erro!
+Bosta!
+
