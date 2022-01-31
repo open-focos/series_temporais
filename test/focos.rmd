@@ -1,11 +1,9 @@
 ---
 title: "Análise de Séries Temporais dos Focos de Calor"
-#output: html_notebook
 output:
-  html_document:
+  html_notebook:
     toc: true
     theme: united
-    
 ---
 
 <br>
@@ -14,6 +12,7 @@ output:
 
 O presente repositório apresenta os *scrips* utilizados durante a elaboração do Trabalho de Conclusão de Curso (TCC), para obtenção do título ***MBA em Data Science and Analytics***, fornecido pelo PECEGE-USP. Faz parte do repositório [open-focos/series_temporais](https://github.com/open-focos/series_temporais).
 
+<br>
 
 **Objetivo do Projeto de Pesquisa**
 
@@ -29,9 +28,9 @@ library('dplyr') # Tables
 library('forecast')
 library('lmtest') # Granger-Causality Test
 library('FinTS') # ArchTest
-library('urca') # Unit Root (Raiz Unitária)
 library('here') # Pastas
 library('rmarkdown')
+library('urca') # Unit Root (Raiz Unitária)
 ```
 
 <br>
@@ -45,7 +44,7 @@ Os dados foram obtidos por meio do [Programa Queimadas](https://queimadas.dgi.in
 
 No presente *script* faz-se a leitura/carregamento desses mesmos dados consolidados até 31.12.2021. Cada registro na tabela representa um foco de calor observado e, para cada foco, tem-se informações sobre o horário de captura do foco pelo satélte, qual o satélite, a localização por meio de coordenadas geográficas entre outras informações.
 
-Fiz a leitura dos dados usando um objeto do tip *data.frame*, porém uma alternativa interessante é utilizar objetos do tipo *tibble*, conforme o prof. Fabiano Guasti sugere. (#TODO)
+Fiz a leitura dos dados usando um objeto do tipo *data.frame*, porém uma alternativa interessante é utilizar objetos do tipo *tibble*, conforme o prof. Fabiano Guasti sugere. (#TODO)
 
 ```{r}
 # Lê Tabela
@@ -121,15 +120,16 @@ df_aqua_m$ano <- NULL
 df_aqua_m$mes <- NULL
 
 # Vê os dtypes
-sapply(df_aqua_m, class)
-sapply(df_aqua_m, typeof)
+#sapply(df_aqua_m, class)
+#sapply(df_aqua_m, typeof)
 
 # Reorder columns
 df_aqua_m <- df_aqua_m[,c(2, 1)]
-colnames(df_aqua_m)
+#colnames(df_aqua_m)
 
+# Results
 head(df_aqua_m)
-tail(df_aqua_m)
+#tail(df_aqua_m)
 ```
 
 <br>
@@ -150,16 +150,16 @@ df_npp_m$ano <- NULL
 df_npp_m$mes <- NULL
 
 # Vê os dtypes
-sapply(df_npp_m, class)
-sapply(df_npp_m, typeof)
+#sapply(df_npp_m, class)
+#sapply(df_npp_m, typeof)
 
 # Reorder columns
 df_npp_m <- df_npp_m[,c(2, 1)]
-colnames(df_npp_m)
+#colnames(df_npp_m)
 
 # Results
 head(df_npp_m)
-tail(df_npp_m)
+#tail(df_npp_m)
 ```
 
 <br>
@@ -177,7 +177,7 @@ Inicialmente fez-se necessário converter a série do *data.frame* em um objeto 
 # Definição da série AQUA
 serie <- ts(
   df_aqua_m$n_focos,
-  start = c(2002,7),
+  start = c(2002, 7),
   end = c(2021, 12),
   frequency = 12
 )
@@ -270,9 +270,15 @@ plot(serie_components)
 
 ----
 
-## Teste de Estacionariedade
+# Estacionariedade
+
+A série ser estacionária é premissa para o modelo estatístico de séries temporais!!
+
+*Uma série temporal estacionária é aquela cujas propriedades estatísticas, como a média, a variância e a auto correlação, são constantes ao longo do tempo.*
 
 <br>
+
+## Testes
 
 É necessário avaliar se a série temporal é estacionária ou não. Para isso há alguns testes que podem ser realizados, principalmente o teste de *Dickey-Fuller*.
 
@@ -287,6 +293,8 @@ tseries::adf.test(serie)
 tseries::adf.test(serie, k = 12)
 ```
 
+<br>
+
 ### Teste de Dickey-Fuller (Pacote *urca*)
 
 Aprendi com prof. Fabiano Guasti
@@ -296,6 +304,8 @@ teste_serie_urca=ur.df(serie)
 teste_serie_urca
 summary(teste_serie_urca)
 ```
+
+<br>
 
 **Conclusão/Interpretação**
 
@@ -329,15 +339,13 @@ Sendo o *t-test* = 0.0829 menor que **0.739** (ponto crítico para 99% confianç
 
 ----
 
-# Definindo Estacionariedade
-
-<br>
+## Definindo Estacionariedade
 
 Visando tornar a série estacionária, é possível promover a diferenciação ou transformação.
 
 <br>
 
-## Diferenciação
+### Diferenciação
 
 No caso da śerie do satélite AQUA-MT a diferenciação não se fazer necessária visto que a série já era estacionária!
 Além disso (e por isso), o *n_dif* resultou em zero!
@@ -359,7 +367,7 @@ ggtsdisplay(serie_ndiff)
 
 <br>
 
-## Transformação
+### Transformação
 
 Visando aperfeiçoar a aderÊncia dos modelos, é possível ainda transformar a série por meio do Box-Cox.
 
@@ -383,7 +391,7 @@ ggtsdisplay(serie_ndiff_bc)
 
 <br>
 
-# Modelo
+# Definição do Modelo
 
 Após estar com a série temporal em mais, corrigida, testada etc: vamos para a parte de definir o modelo e estimar coeficientes. Isso é feito com o ***auto.arima***, conforme apresentaod a seguir.
 
@@ -399,22 +407,21 @@ modelo_t
 
 Por meio do *Best Model* descobri que meu modelo é um SARIMA, ou seja, um ARIMA com sazonalidade.
 
-[Estudar](https://otexts.com/fpp3/seasonal-arima.html)
+- [Estudar Seasonal-Arima](https://otexts.com/fpp3/seasonal-arima.html)
 
-Notei tb que consegui um AIC muito baixo com a transformação de Box-Cox.
-Não sei se isso é melhor do que sem a transformação.
+Notei também que consegui um AIC muito baixo com a transformação de Box-Cox. Não sei se isso é melhor do que sem a transformação! Estudar.
 
-ARIMA(1,0,0)(0,1,1)[12]
-Modelo
+**Modelo ARIMA(1,0,0)(0,1,1)[12]**:
+
 - Autoregressivo de ordem 1
 - Não Integrado
 - Sem Médias Móveis
 
-Sazonal:
+**Sazonal:**
+
 - Não Autoregressivo
 - Integrado
 - Com Médias Móveis
-
 
 ```{r}
 modelo_t$coef
@@ -424,13 +431,14 @@ modelo_t$coef
 
 <br>
 
-# Resíduos
+# Análise dos Resíduos
 
 A análise dos resíduos é fundamental.
+
 - Os resíduos não podem ter autocorrelação!
 - Os resíduos precisam ter uma distribuição normal!
 
-[residuals](https://stackoverflow.com/questions/55742013/extract-p-value-from-checkresiduals-function)
+- [Stackoverflow: Residuals](https://stackoverflow.com/questions/55742013/extract-p-value-from-checkresiduals-function)
 
 <br>
 
@@ -447,11 +455,13 @@ checkresiduals(modelo_t)
 
 **Conclusão/Interpretação**
 
-teste de Ljung-Box p-value = 0.7287>0.01, aceitamos H0, resíduos não são correlacionados
+Teste de Ljung-Box apresenta *p-valor* 0.7401, que é maior que 0,01.
+
+Aceitamos H0: resíduos não são correlacionados
 
 <br>
 
-## Normalidade dos resíduos
+## Normalidade dos Resíduos
 
 Teste de Kolmogorov Smirnov
 
@@ -464,12 +474,16 @@ ks.test(
 )
 ```
 
+<br>
+
 **Conclusão/Interpretação**
 
-p-valor é 0.0653 e, portantro, maior que 0,01.
+*p-valor* é 0.0653 e, portanto, maior que 0,01.
 Aceita-se H0, ou seja, os resíduos são normais!
 
-Confirmada a não existência de autocorrelação serial e normalidade dos resíduos
+<br>
+
+**Confirmada a não existência de autocorrelação serial e normalidade dos resíduos**
 
 <br>
 
@@ -482,13 +496,21 @@ Verificar se existe efeitos ARCH
 ArchTest(modelo_t$residuals)
 ```
 
+<br>
+
 **Conclusão/Interpretação**
 
 p-valor 0.583 > 0,01, aceita-se H0, não se rejeita a H0, garante não existência de efeitos ARCH
 
+<br>
+
 -----
 
 # Previsão
+
+A previsão está com a série transformada. Aprender a "destransformar", apresentando a previsão com a escala real!
+
+<br>
 
 ```{r}
 # Previsão
@@ -499,39 +521,68 @@ plot(serie_ndiff_bc_forecast)
 
 
 ```{r}
-accuracy(modelo_t,
-  #df_sat$n_focos
-)
-#accuracy(prevvarejo, varejoteste)
+#accuracy(modelo_t, conjunto teste)
+accuracy(modelo_t)
 ```
-MAPE 50: signifa que tem 50% de erro!
-Bosta!
+
+<br>
+
+**Interpretação**
+
+O MAPE talvez seja o parâmetro mais empregado no teste de acurácia do modelo. Um MAPA de 50, signifa que tem 50% de erro (uma bosta)!
+
+Consegui um MAPA de 5, ou seja, 5% de erro!
+Pra mim, está ótimo!
 
 <br>
 
 ----
 
-# Comparando Séries
+# Comparando Séries: *Grand Finale*
 
-**Granger-Causality Test**
+Retomando os **Objetivo do Projeto de Pesquisa**, fica explicito que o objetivo principal é comparar séries!
+
+*Analisar e comparar as tendências e sazonalidades da quantidade de focos de calor obtidos com os satélites AQUA-MT, atualmente empregado na política pública de combate aos incêndios no estado de São Paulo, e aqueles obtidos pelo satélite Suomi NPP, mais sensível aos focos de calor, ao longo da série histórica.*
+
+<br>
+
+Descobri que existe um teste para isso, chamado: **Granger-Causality Test**
+
 - H0: Time series X does not cause time series Y to Granger-cause itself.
 - H1: Time series X  cause time series Y to Granger-cause itself.
 
+Curioso o fato de que a comparação de séries não significa, propriamente, a comparação de modelos!
+
+<br>
+
 **Referência**
+
 - [StackExchange: How to statistically compare two time series?](https://stats.stackexchange.com/questions/19103/how-to-statistically-compare-two-time-series)
 - [Wikipedia: Granger causality](https://en.wikipedia.org/wiki/Granger_causality)
 
 ```{r}
-grangertest(serie_npp ~ serie_aqua)
+grangertest(serie_npp ~ serie_aqua, order = 12)
 ```
 
-Podemos rejeitar a hipótese nula do teste porque o valor de p é menor que 0,05, e inferir que conhecer os valores de serie_aqua é valioso para prever os valores futuros de serie_npp
+<br>
 
+Podemos rejeitar a hipótese nula do teste porque o valor de p é menor que 0,05, e inferir que conhecer os valores de AQUA são relevantes para prever os valores futuros da quantidade de focos do NPP.
 
 ```{r}
-grangertest(serie_aqua ~ serie_npp)
+grangertest(serie_aqua ~ serie_npp, order = 12)
 ```
 
-O reverso não ocorre!! Os valores de NPP não possibilitam prever AQUA!!
-Com p-valor de 0.3424, maior que 0.05, devemos aceitar a hipotese nula.
+<br>
 
+Contudo, o reverso não ocorre!!
+
+Os valores de NPP não possibilitam prever AQUA!!
+Com p-valor de 0.3424, maior que 0.05, devemos aceitar a hipotese nula!
+
+<br>
+
+## Fim
+
+Michel Metran da Silva<br>
+Piracicaba, 31 de janeiro de 2022
+<br>
