@@ -1,12 +1,18 @@
 ---
-title: "Focos de Calor"
+title: "Análise de Séries Temporais dos Focos de Calor"
 output: html_notebook
 ---
 
+**Sobre**
 
-O presente script é parte dos estudos para entrega do TCC do PECEGE.
-O objetivo é comparar séries históricas.
+O presente repositório apresenta os *scrips* utilizados durante a elaboração do Trabalho de Conclusão de Curso (TCC), para obtenção do título ***MBA em Data Science and Analytics***, fornecido pelo PECEGE-USP. Faz parte do repositório [open-focos/series_temporais](https://github.com/open-focos/series_temporais).
 
+
+**Objetivo do Projeto de Pesquisa**
+
+Analisar e comparar as tendências e sazonalidades da quantidade de focos de calor obtidos com os satélites AQUA-MT, atualmente empregado na política pública de combate aos incêndios no estado de São Paulo, e aqueles obtidos pelo satélite Suomi NPP, mais sensível aos focos de calor, ao longo da série histórica.
+
+-----
 
 Inicialmente importa-se os *packages* que serão necessários para a análise
 
@@ -17,17 +23,21 @@ library('forecast')
 library('here') # Pastas
 ```
 
+<br>
 
 # Dados
 
-Posteriormente faz-se a leitura/carregamento dos dados.
+Os dados foram obtidos por meio do [Programa Queimadas](https://queimadas.dgi.inpe.br/queimadas/portal), mantido pelo INPE.
+*Scripts* foram elaborados para obtenção contínua desses dados, visando garantir que o [*site* openfocos.michelmetran.com.br](https://openfocos.michelmetran.com.br/sat/) que elaborei, apresentando *dashboards* elaborados com o *Tableau*, estivesse permanentemente atualizado. No repositório [open-focos/focos_inpe](https://github.com/open-focos/focos_inpe) são apresentadas as rotinas e ajustes para obtenção dos dados.
+
+No presente *script* faz-se a leitura/carregamento desses mesmos dados consolidados até 31.12.2021.
 
 Fiz usando o *data.frame*, porém uma alternativa interessante é utilizar objetos do tipo *tibble*, conforme o prof. Fabiano Guasti sugere.
 
 ```{r}
 # Lê Tabela ----
 df <- read.csv(
-  here(here('data', 'tab_serie_gmt_1999-2021.csv')),
+  here(here('data', 'input', 'tab_serie_gmt_1999-2021.csv')),
   header = TRUE,
   sep = ';',
   dec=',',
@@ -63,14 +73,17 @@ Uma vez com a tabela ajustada, com as correções dos *dtypes*, é possível ext
 ```{r}
 # Lista de Satélites
 list_sats <- unique(df$satelite)
-list_sats[1]
+list_sats
 
-# Extraí Satélite
-df <- subset(df, satelite == 'AQUA_M-T')
-df
+# Extraí Satélite AQUA_M-T
+df_aqua <- subset(df, satelite == 'AQUA_M-T')
+df_aqua
+str(df_aqua)
 
-# 
-str(df)
+# Extraí Satélite NPP-375
+df_npp <- subset(df, satelite == 'NPP-375')
+df_npp
+str(df_npp)
 ```
 
 <br>
@@ -78,18 +91,34 @@ str(df)
 # Faz acúmulo pra Dados Mensal
 
 ```{r}
-# Agrupa Dataframe ----
-df_sat <- df %>%
+# Agrupa Dataframe AQUA
+df_aqua_m <- df_aqua %>%
   dplyr::group_by(ano, mes) %>%
   dplyr::summarise(n_focos = n(), .groups = 'drop')
 
 # Cria coluna com Data
-df_sat$date <- zoo::as.yearmon(paste(df_sat$ano, df_sat$mes), '%Y %m')
+df_aqua_m$date <- zoo::as.yearmon(paste(df_aqua_m$ano, df_aqua_m$mes), '%Y %m')
 
 # Deleta Mês e Ano
-df_sat$ano <- NULL
-df_sat$mes <- NULL
-df_sat
+df_aqua_m$ano <- NULL
+df_aqua_m$mes <- NULL
+head(df_aqua_m)
+tail(df_aqua_m)
+
+
+# Agrupa Dataframe NPP
+df_npp_m <- df_npp %>%
+  dplyr::group_by(ano, mes) %>%
+  dplyr::summarise(n_focos = n(), .groups = 'drop')
+
+# Cria coluna com Data
+df_npp_m$date <- zoo::as.yearmon(paste(df_npp_m$ano, df_npp_m$mes), '%Y %m')
+
+# Deleta Mês e Ano
+df_npp_m$ano <- NULL
+df_npp_m$mes <- NULL
+head(df_npp_m)
+tail(df_npp_m)
 ```
 
 
