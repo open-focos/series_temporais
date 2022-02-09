@@ -58,6 +58,7 @@ df <- read.csv(
 # Results
 head(df)
 ```
+
 <br>
 
 Após a leitura da tabela, alguns ajustes nos tipos de variáveis das colunas.
@@ -119,16 +120,22 @@ df_aqua_m$date <- zoo::as.yearmon(paste(df_aqua_m$ano, df_aqua_m$mes), '%Y %m')
 df_aqua_m$ano <- NULL
 df_aqua_m$mes <- NULL
 
-# Vê os dtypes
-#sapply(df_aqua_m, class)
-#sapply(df_aqua_m, typeof)
-
 # Reorder columns
 df_aqua_m <- df_aqua_m[,c(2, 1)]
 #colnames(df_aqua_m)
 
+# Filtra Data
+df_aqua_m_all <- df_aqua_m
+df_aqua_m <- df_aqua_m %>%
+  filter(date >= "2012-1")
+
+# Vê os dtypes
+#sapply(df_aqua_m, class)
+#sapply(df_aqua_m, typeof)
+
 # Results
 head(df_aqua_m)
+head(df_aqua_m_all)
 #tail(df_aqua_m)
 ```
 
@@ -157,6 +164,10 @@ df_npp_m$mes <- NULL
 df_npp_m <- df_npp_m[,c(2, 1)]
 #colnames(df_npp_m)
 
+# Filtra Data
+df_npp_m <- df_npp_m %>%
+  filter(date >= "2012-1")
+
 # Results
 head(df_npp_m)
 #tail(df_npp_m)
@@ -175,8 +186,8 @@ Inicialmente fez-se necessário converter a série do *data.frame* em um objeto 
 
 ```{r}
 # Definição da série AQUA
-serie <- ts(
-  df_aqua_m$n_focos,
+serie_aqua_all <- ts(
+  df_aqua_m_all$n_focos,
   start = c(2002, 7),
   end = c(2021, 12),
   frequency = 12
@@ -199,6 +210,7 @@ serie_npp <- ts(
 )
 
 # Results
+serie <- serie_aqua
 serie
 ```
 
@@ -248,6 +260,17 @@ seasonplot(
   pch=16
 )
 ```
+
+```{r}
+ggseasonplot(serie, polar = T)
+```
+
+
+
+```{r}
+ggsubseriesplot(serie)
+```
+
 
 <br>
 
@@ -333,6 +356,7 @@ summary(teste_kpss)
 ```
 
 **Conclusão/Interpretação**
+
 Sendo o *t-test* = 0.0829 menor que **0.739** (ponto crítico para 99% confiança): ACEITO Ho e, portanto, a série é estacionária.
 
 <br>
@@ -369,7 +393,7 @@ ggtsdisplay(serie_ndiff)
 
 ### Transformação
 
-Visando aperfeiçoar a aderÊncia dos modelos, é possível ainda transformar a série por meio do Box-Cox.
+Visando aperfeiçoar a aderência dos modelos, é possível ainda transformar a série por meio do Box-Cox.
 
 ```{r}
 # Parâmetro Lambda
@@ -393,14 +417,22 @@ ggtsdisplay(serie_ndiff_bc)
 
 # Definição do Modelo
 
+A função frequency determina a frequência da série. Para dados sazonais, irá definir o período dominante da sazonalidade, e para dados em ciclos, a duração média dos ciclos.
+https://www.pedronl.com/post/previsao-de-series-temporais-com-o-r/
+
+```{r}
+frequency(serie)
+```
+
+
 Após estar com a série temporal em mais, corrigida, testada etc: vamos para a parte de definir o modelo e estimar coeficientes. Isso é feito com o ***auto.arima***, conforme apresentaod a seguir.
 
 ```{r}
-# Best model: ARIMA(1,0,0)(0,1,1)[12] 
+# Best model: ARIMA(1,0,0)(0,1,1)[12] with drift 
 modelo = auto.arima(serie, trace=T)
 modelo
 
-# Best model: ARIMA(1,0,0)(0,1,1)[12] with drift 
+# Best model: ARIMA(1,0,0)(2,1,1)[12]
 modelo_t = auto.arima(serie_ndiff_bc, trace=T)
 modelo_t
 ```
