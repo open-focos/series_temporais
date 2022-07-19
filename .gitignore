@@ -1,8 +1,8 @@
 # Dados
-scripts/*.html
-docs/imgs/*
-!docs/imgs/focos.png
 data/output/
+docs/imgs/*
+!docs/imgs/focos.jpg
+scripts/*.html
 
 # R
 .Rproj.user/
