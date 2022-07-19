@@ -1,5 +1,8 @@
 # Dados
-test/*.html
+scripts/*.html
+docs/imgs/*
+!docs/imgs/focos.png
+data/output/
 
 # R
 .Rproj.user/

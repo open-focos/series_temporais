@@ -1,9 +1,9 @@
 ---
 title: "Análise de Séries Temporais dos Focos de Calor"
 output:
-  html_notebook:
-    toc: true
-    theme: united
+html_notebook:
+toc: true
+theme: united
 ---
 
 <br>
@@ -49,10 +49,10 @@ Fiz a leitura dos dados usando um objeto do tipo *data.frame*, porém uma altern
 ```{r}
 # Lê Tabela
 df <- read.csv(
-  here(here('data', 'input', 'tab_serie_gmt_1999-2021.csv')),
+  here('data', 'input', 'tab_serie_gmt_1999-2021.csv'),
   header = TRUE,
   sep = ';',
-  dec=',',
+  dec = ',',
 )
 
 # Results
@@ -65,8 +65,8 @@ Após a leitura da tabela, alguns ajustes nos tipos de variáveis das colunas.
 
 ```{r}
 # Ajusta os dtypes
-df$data_hora_gmt <- as.Date(df$data_hora_gmt, format='%Y-%m-%d %H:%M:%S')
-df$data_hora_sp <- as.Date(df$data_hora_sp, format='%Y-%m-%d %H:%M:%S')
+df$data_hora_gmt <- as.Date(df$data_hora_gmt, format = '%Y-%m-%d %H:%M:%S')
+df$data_hora_sp <- as.Date(df$data_hora_sp, format = '%Y-%m-%d %H:%M:%S')
 
 # Extraí parte da data
 df$ano <- lubridate::year(df$data_hora_sp)
@@ -121,7 +121,7 @@ df_aqua_m$ano <- NULL
 df_aqua_m$mes <- NULL
 
 # Reorder columns
-df_aqua_m <- df_aqua_m[,c(2, 1)]
+df_aqua_m <- df_aqua_m[, c(2, 1)]
 #colnames(df_aqua_m)
 
 # Filtra Data
@@ -161,7 +161,7 @@ df_npp_m$mes <- NULL
 #sapply(df_npp_m, typeof)
 
 # Reorder columns
-df_npp_m <- df_npp_m[,c(2, 1)]
+df_npp_m <- df_npp_m[, c(2, 1)]
 #colnames(df_npp_m)
 
 # Filtra Data
@@ -177,7 +177,7 @@ head(df_npp_m)
 
 ----
 
-# Séries Temporais
+# Séries Temporais (Sat)
 
 Uma vez com os dados devidamente organizados, agrupados etc, foi possível dar início a análise das séries temporais.
 Inicialmente fez-se necessário converter a série do *data.frame* em um objeto *time-series* (ou *ts*).
@@ -210,7 +210,11 @@ serie_npp <- ts(
 )
 
 # Results
+sat_select <- 'aqua'
 serie <- serie_aqua
+
+#sat_select <- 'npp'
+#serie <- serie_npp
 serie
 ```
 
@@ -224,10 +228,29 @@ Gráficos possibilitam ver a série temporal e começam a trazer interpretaçõe
 
 Todas estas variáveis contribuiram para o número de focos registrado.
 
+
 ```{r}
 # Gráficos
 forecast::autoplot(serie)
-plot.ts(serie, main = 'Nº de Focos de Calor')
+
+# Open File
+filename <- paste('1_', sat_select, '_serie', '.png', sep = '')
+png(here('imgs', filename), width = 700, height = 400, unit = "px")
+
+# Margins: Botton, Left , Top, Right
+par(mar = c(2.5, 4.5, 2, 2))
+
+# Graphic
+plot.ts(
+  serie,
+  #main = 'Nº de Focos de Calor',
+  ylab = 'Nº de Focos de Calor',
+  xlab = '',
+  col = "#2E9FDF"
+)
+
+# Salve
+dev.off()
 ```
 
 <br>
@@ -242,10 +265,27 @@ O **PACF** (*partial autocorrelation function*) evidencia picos no *lag* 12 apro
 # Gráficos
 acf(serie) # autocorrelação
 pacf(serie) # autocorrelação parcial
+```
+
+```{r}
+ggtsdisplay(serie)
+```
+
+
+```{r}
+# Open File
+filename <- paste('2_', sat_select, '_acf_pacf', '.png', sep = '')
+png(here('imgs', filename), width = 700, height = 400, unit = "px")
+
+# Margins: Botton, Left , Top, Right
+par(mar = c(2.5, 4.5, 2, 2))
 
 # Avaliação em visualização única
-ggtsdisplay(serie) 
+ggtsdisplay(serie)
 ```
+
+
+
 <br>
 
 Outro gráfico interessante mostra a série de todos os anos, no mesmo gráfico.
@@ -254,10 +294,10 @@ Tal gráfico evidencia que nos meses de agosto/setembro são esperados mais foco
 ```{r}
 seasonplot(
   serie,
-  col=rainbow(12),
-  year.labels=TRUE,
-  type='o',
-  pch=16
+  col = rainbow(12),
+  year.labels = TRUE,
+  type = 'o',
+  pch = 16
 )
 ```
 
@@ -280,14 +320,34 @@ Variações sazonais e aleatórias parecem ser constante ao longo do texto
 
 ```{r}
 # Decompose: estimando os componentes
-serie_components <- decompose(serie) 
+serie_components <- decompose(serie)
 
 # Obter os valores estimados do componentes sazonal
-serie_components$seasonal 
+serie_components$seasonal
 
 # Plot
-plot(serie_components)
+#urca::plot(serie_components)
+#base::plot(serie_components)
+autoplot(serie_components)
 ```
+
+
+```{r}
+# Open File
+filename <- paste('3_', sat_select, '_decompose', '.png', sep = '')
+png(here('imgs', filename), width = 700, height = 400, unit = "px")
+
+# Margins: Botton, Left , Top, Right
+par(mar = c(2.5, 4.5, 2, 2))
+
+# Plot
+#plot(serie_components)
+autoplot(serie_components)
+
+# Salve
+#dev.off()
+```
+
 
 <br>
 
@@ -323,7 +383,7 @@ tseries::adf.test(serie, k = 12)
 Aprendi com prof. Fabiano Guasti
 
 ```{r}
-teste_serie_urca=ur.df(serie)
+teste_serie_urca = ur.df(serie)
 teste_serie_urca
 summary(teste_serie_urca)
 ```
@@ -350,7 +410,7 @@ Por que o mesmo teste, calculado em diferentes, resulta em valores distintos?
 - H1: A série NÃO é Estacionária
 
 ```{r}
-teste_kpss=ur.kpss(serie)
+teste_kpss = ur.kpss(serie)
 teste_kpss
 summary(teste_kpss)
 ```
@@ -379,7 +439,7 @@ Além disso (e por isso), o *n_dif* resultou em zero!
 diff(serie)
 
 # Calcula diferença entre os meses
-n_dif <- ndiffs(serie) 
+n_dif <- ndiffs(serie)
 n_dif
 
 #serie_ndiff <- diff(serie, n_dif)
@@ -404,7 +464,7 @@ lbd
 serie_ndiff_bc <- BoxCox(serie_ndiff, lambda = lbd)
 
 # Antes
-hist(serie_ndiff_bc) 
+hist(serie_ndiff_bc)
 
 # Gráfico Simples
 autoplot(serie_ndiff_bc)
@@ -412,6 +472,18 @@ autoplot(serie_ndiff_bc)
 # Gráfico Combinado
 ggtsdisplay(serie_ndiff_bc)
 ```
+
+```{r}
+# Open File
+filename <- paste('4_', sat_select, '_acf_pacf_box_cox', '.png', sep = '')
+png(here('imgs', filename), width = 700, height = 400, unit = "px")
+
+# Margins: Botton, Left , Top, Right
+par(mar = c(2.5, 4.5, 2, 2))
+
+ggtsdisplay(serie_ndiff_bc)
+```
+
 
 <br>
 
@@ -429,13 +501,17 @@ Após estar com a série temporal em mais, corrigida, testada etc: vamos para a 
 
 ```{r}
 # Best model: ARIMA(1,0,0)(0,1,1)[12] with drift 
-modelo = auto.arima(serie, trace=T)
+modelo = auto.arima(serie, trace = T)
 modelo
+```
 
+```{r}
 # Best model: ARIMA(1,0,0)(2,1,1)[12]
-modelo_t = auto.arima(serie_ndiff_bc, trace=T)
+modelo_t = auto.arima(serie_ndiff_bc, trace = T)
 modelo_t
 ```
+
+
 
 Por meio do *Best Model* descobri que meu modelo é um SARIMA, ou seja, um ARIMA com sazonalidade.
 
@@ -479,9 +555,24 @@ A análise dos resíduos é fundamental.
 Com o teste de *Ljung-Box*, obtemos o *p-valor* e, se menor que 0,05, aceitamos H0, e portanto, definimos que os resíduos não estão correlacionados!
 
 ```{r}
-checkresiduals(modelo)
-checkresiduals(modelo_t)
+#forecast::checkresiduals(modelo)
+forecast::checkresiduals(modelo_t, lag = 12)
 ```
+
+
+
+```{r}
+# Open File
+filename <- paste('5_', sat_select, '_residuals_box_cox', '.png', sep = '')
+png(here('imgs', filename), width = 700, height = 400, unit = "px")
+
+# Margins: Botton, Left , Top, Right
+par(mar = c(2.5, 4.5, 2, 2))
+
+forecast::checkresiduals(modelo_t, lag = 12)
+```
+
+
 
 <br>
 
@@ -550,6 +641,20 @@ serie_ndiff_bc_forecast <- forecast::forecast(modelo_t, h = 48)
 
 plot(serie_ndiff_bc_forecast)
 ```
+
+
+```{r}
+# Open File
+filename <- paste('6_', sat_select, '_forecast_box_cox', '.png', sep = '')
+png(here('imgs', filename), width = 700, height = 400, unit = "px")
+
+# Margins: Botton, Left , Top, Right
+par(mar = c(2.5, 4.5, 2, 2))
+
+# Graph
+plot(serie_ndiff_bc_forecast)
+```
+
 
 
 ```{r}
